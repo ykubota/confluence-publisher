@@ -530,6 +530,32 @@ public class ConfluencePublisherTest {
     }
 
     @Test
+    public void publish_metadataWithMultipleRemovedPagesInHierarchy_notSendDeletePageRequestForEachRemovedPage_withSkipDeleteOrphanedPages() {
+        // arrange
+        ConfluencePage existingParentPage = new ConfluencePage("99991", "Some Confluence Content", "<h1>Some Confluence Content</1>", 2);
+        ConfluencePage existingChildPage = new ConfluencePage("99992", "Some Child Content", "<h1>Some Child Content</1>", 3);
+
+        ConfluenceRestClient confluenceRestClientMock = mock(ConfluenceRestClient.class);
+        when(confluenceRestClientMock.getChildPages("99991")).thenReturn(singletonList(existingParentPage));
+        when(confluenceRestClientMock.getChildPages("99992")).thenReturn(singletonList(existingChildPage));
+
+        ConfluencePublisherListener confluencePublisherListenerMock = mock(ConfluencePublisherListener.class);
+
+        ConfluencePublisher confluencePublisher = confluencePublisher("zero-page-space-key", confluenceRestClientMock, confluencePublisherListenerMock,  "version message");
+
+        // act
+        confluencePublisher.publish();
+
+        // assert
+        verify(confluenceRestClientMock, times(0)).deletePage(eq("99992"));
+
+        verify(confluencePublisherListenerMock, times(0)).pageDeleted(eq(new ConfluencePage("99991", "Some Confluence Content", "<h1>Some Confluence Content</1>", 2)));
+        verify(confluencePublisherListenerMock, times(0)).pageDeleted(eq(new ConfluencePage("99992", "Some Child Content", "<h1>Some Child Content</1>", 3)));
+        verify(confluencePublisherListenerMock, times(1)).publishCompleted();
+        verifyNoMoreInteractions(confluencePublisherListenerMock);
+    }
+
+    @Test
     public void publish_metadataWithMultipleRemovedPagesInHierarchy_sendsDeletePageRequestForEachRemovedPageExpectAncestor() {
         // arrange
         ConfluencePage existingParentPage = new ConfluencePage("2345", "Some Confluence Content", "<h1>Some Confluence Content</1>", 2);
@@ -562,11 +588,19 @@ public class ConfluencePublisherTest {
         return confluencePublisher(qualifier, confluenceRestClient, confluencePublisherListener, APPEND_TO_ANCESTOR, versionedMessage);
     }
 
+    private static ConfluencePublisher confluencePublisher(String qualifier, ConfluenceRestClient confluenceRestClient, ConfluencePublisherListener confluencePublisherListener, boolean skipDeleteOrphanedPages, String versionedMessage) {
+        return confluencePublisher(qualifier, APPEND_TO_ANCESTOR, confluenceRestClient, confluencePublisherListener, skipDeleteOrphanedPages, versionedMessage);
+    }
+
     private static ConfluencePublisher confluencePublisher(String qualifier, ConfluenceRestClient confluenceRestClient, ConfluencePublisherListener confluencePublisherListener, PublishingStrategy publishingStrategy, String versionMessage) {
         return confluencePublisher(qualifier, publishingStrategy, confluenceRestClient, confluencePublisherListener, versionMessage);
     }
 
     private static ConfluencePublisher confluencePublisher(String qualifier, PublishingStrategy publishingStrategy, ConfluenceRestClient confluenceRestClient, ConfluencePublisherListener confluencePublisherListener, String versionMessage) {
+        return confluencePublisher(qualifier, publishingStrategy, confluenceRestClient, confluencePublisherListener, false, versionMessage);
+    }
+
+    private static ConfluencePublisher confluencePublisher(String qualifier, PublishingStrategy publishingStrategy, ConfluenceRestClient confluenceRestClient, ConfluencePublisherListener confluencePublisherListener, boolean skipDeleteOrphanedPages, String versionMessage) {
         Path metadataFilePath = Paths.get(TEST_RESOURCES + "/metadata-" + qualifier + ".json");
         Path contentRoot = metadataFilePath.getParent().toAbsolutePath();
 
@@ -574,7 +608,7 @@ public class ConfluencePublisherTest {
         resolveAbsoluteContentFileAndAttachmentsPath(metadata.getPages(), contentRoot);
 
         if (confluencePublisherListener != null) {
-            return new ConfluencePublisher(metadata, publishingStrategy, confluenceRestClient, confluencePublisherListener, versionMessage);
+            return new ConfluencePublisher(metadata, publishingStrategy, confluenceRestClient, confluencePublisherListener, skipDeleteOrphanedPages, versionMessage);
         }
 
         return new ConfluencePublisher(metadata, publishingStrategy, confluenceRestClient);

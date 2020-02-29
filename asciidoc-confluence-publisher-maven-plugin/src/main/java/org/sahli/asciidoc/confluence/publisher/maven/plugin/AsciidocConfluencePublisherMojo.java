@@ -71,6 +71,9 @@ public class AsciidocConfluencePublisherMojo extends AbstractMojo {
     @Parameter(defaultValue = "APPEND_TO_ANCESTOR")
     private PublishingStrategy publishingStrategy;
 
+    @Parameter(defaultValue = "false")
+    private boolean skipDeleteOrphanedPages;
+
     @Parameter
     private String versionMessage;
 
@@ -127,7 +130,7 @@ public class AsciidocConfluencePublisherMojo extends AbstractMojo {
             ConfluenceRestClient confluenceRestClient = new ConfluenceRestClient(this.rootConfluenceUrl, proxyConfiguration, this.skipSslVerification, this.username, this.password);
             ConfluencePublisherListener confluencePublisherListener = new LoggingConfluencePublisherListener(getLog());
 
-            ConfluencePublisher confluencePublisher = new ConfluencePublisher(confluencePublisherMetadata, this.publishingStrategy, confluenceRestClient, confluencePublisherListener, this.versionMessage);
+            ConfluencePublisher confluencePublisher = new ConfluencePublisher(confluencePublisherMetadata, this.publishingStrategy, confluenceRestClient, confluencePublisherListener, this.skipDeleteOrphanedPages, this.versionMessage);
             confluencePublisher.publish();
         } catch (Exception e) {
             if (getLog().isDebugEnabled()) {

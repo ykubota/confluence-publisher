@@ -55,19 +55,21 @@ public class ConfluencePublisher {
     private final PublishingStrategy publishingStrategy;
     private final ConfluenceClient confluenceClient;
     private final ConfluencePublisherListener confluencePublisherListener;
+    private final boolean skipDeleteOrphanedPages;
     private final String versionMessage;
 
     public ConfluencePublisher(ConfluencePublisherMetadata metadata, PublishingStrategy publishingStrategy, ConfluenceClient confluenceClient) {
-        this(metadata, publishingStrategy, confluenceClient, new NoOpConfluencePublisherListener(), null);
+        this(metadata, publishingStrategy, confluenceClient, new NoOpConfluencePublisherListener(), false, null);
     }
 
     public ConfluencePublisher(ConfluencePublisherMetadata metadata, PublishingStrategy publishingStrategy,
                                ConfluenceClient confluenceClient, ConfluencePublisherListener confluencePublisherListener,
-                               String versionMessage) {
+                               boolean skipDeleteOrphanedPages, String versionMessage) {
         this.metadata = metadata;
         this.publishingStrategy = publishingStrategy;
         this.confluenceClient = confluenceClient;
         this.confluencePublisherListener = confluencePublisherListener;
+        this.skipDeleteOrphanedPages = skipDeleteOrphanedPages;
         this.versionMessage = versionMessage;
     }
 
@@ -131,6 +133,9 @@ public class ConfluencePublisher {
     }
 
     private void deleteConfluencePagesNotPresentUnderAncestor(List<ConfluencePageMetadata> pagesToKeep, String ancestorId) {
+        if (skipDeleteOrphanedPages) {
+            return;
+        }
         List<ConfluencePage> childPagesOnConfluence = this.confluenceClient.getChildPages(ancestorId);
 
         List<ConfluencePage> childPagesOnConfluenceToDelete = childPagesOnConfluence.stream()
