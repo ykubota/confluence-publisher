@@ -65,7 +65,6 @@ public class AsciidocConfluencePublisherCommandLineClientTest {
 
     private static Iterable<String> mandatoryArgumentNames() {
         return asList(
-                "ancestorId",
                 "spaceKey",
                 "password",
                 "username",

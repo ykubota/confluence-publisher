@@ -22,12 +22,14 @@ import org.sahli.asciidoc.confluence.publisher.client.PublishingStrategy;
 import org.sahli.asciidoc.confluence.publisher.client.http.ConfluencePage;
 import org.sahli.asciidoc.confluence.publisher.client.http.ConfluenceRestClient;
 import org.sahli.asciidoc.confluence.publisher.client.http.ConfluenceRestClient.ProxyConfiguration;
+import org.sahli.asciidoc.confluence.publisher.client.http.NotFoundException;
 import org.sahli.asciidoc.confluence.publisher.client.metadata.ConfluencePublisherMetadata;
 import org.sahli.asciidoc.confluence.publisher.converter.AsciidocConfluenceConverter;
 import org.sahli.asciidoc.confluence.publisher.converter.AsciidocPagesStructureProvider;
 import org.sahli.asciidoc.confluence.publisher.converter.FolderBasedAsciidocPagesStructureProvider;
 import org.sahli.asciidoc.confluence.publisher.converter.PageTitlePostProcessor;
 import org.sahli.asciidoc.confluence.publisher.converter.PrefixAndSuffixPageTitlePostProcessor;
+
 
 import java.io.IOException;
 import java.nio.charset.Charset;
@@ -55,7 +57,8 @@ public class AsciidocConfluencePublisherCommandLineClient {
         String username = argumentsParser.mandatoryArgument("username", args);
         String password = argumentsParser.mandatoryArgument("password", args);
         String spaceKey = argumentsParser.mandatoryArgument("spaceKey", args);
-        String ancestorId = argumentsParser.mandatoryArgument("ancestorId", args);
+        String ancestorId = argumentsParser.optionalArgument("ancestorId", args).orElse(null);
+        String ancestorTitle = argumentsParser.optionalArgument("ancestorTitle", args).orElse(null);
         String versionMessage = argumentsParser.optionalArgument("versionMessage", args).orElse(null);
         PublishingStrategy publishingStrategy = PublishingStrategy.valueOf(argumentsParser.optionalArgument("publishingStrategy", args).orElse(APPEND_TO_ANCESTOR.name()));
         boolean skipDeleteOrphanedPages = argumentsParser.optionalBooleanArgument("skipDeleteOrphanedPages", args).orElse(false);
@@ -78,12 +81,22 @@ public class AsciidocConfluencePublisherCommandLineClient {
             AsciidocPagesStructureProvider asciidocPagesStructureProvider = new FolderBasedAsciidocPagesStructureProvider(documentationRootFolder, sourceEncoding);
             PageTitlePostProcessor pageTitlePostProcessor = new PrefixAndSuffixPageTitlePostProcessor(prefix, suffix);
 
+            ProxyConfiguration proxyConfiguration = new ProxyConfiguration(proxyScheme, proxyHost, proxyPort, proxyUsername, proxyPassword);
+            ConfluenceRestClient confluenceClient = new ConfluenceRestClient(rootConfluenceUrl, proxyConfiguration, skipSslVerification, username, password);
+
+            if (ancestorId == null) {
+                if (ancestorTitle == null) {
+                    throw new IllegalArgumentException("Either of ancestorId or ancestorTitle is mandatory.");
+                }
+                try {
+                    ancestorId = confluenceClient.getPageByTitle(spaceKey, ancestorTitle);
+                } catch (NotFoundException e) {
+                    throw new IllegalArgumentException("Could not find the parent page being entitled: " + ancestorTitle, e);
+                }
+            }
             AsciidocConfluenceConverter asciidocConfluenceConverter = new AsciidocConfluenceConverter(spaceKey, ancestorId);
             ConfluencePublisherMetadata confluencePublisherMetadata = asciidocConfluenceConverter.convert(asciidocPagesStructureProvider, pageTitlePostProcessor, buildFolder, attributes);
 
-            ProxyConfiguration proxyConfiguration = new ProxyConfiguration(proxyScheme, proxyHost, proxyPort, proxyUsername, proxyPassword);
-
-            ConfluenceRestClient confluenceClient = new ConfluenceRestClient(rootConfluenceUrl, proxyConfiguration, skipSslVerification, username, password);
             ConfluencePublisher confluencePublisher = new ConfluencePublisher(confluencePublisherMetadata, publishingStrategy, confluenceClient, new SystemOutLoggingConfluencePublisherListener(), skipDeleteOrphanedPages, versionMessage);
             confluencePublisher.publish();
         } finally {
