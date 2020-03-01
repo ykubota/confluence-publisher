@@ -162,6 +162,13 @@ class HttpRequestFactory {
         return new HttpGet(searchQuery);
     }
 
+    public HttpGet getAncestorsByIdRequest(String contentId) {
+        assertMandatoryParameter(isNotBlank(contentId), "contentId");
+
+        String searchQuery = this.confluenceRestApiEndpoint + "/content/" + contentId + "?expand=ancestors";
+        return new HttpGet(searchQuery);
+    }
+
     HttpGet getAttachmentByFileNameRequest(String contentId, String attachmentFileName, String expandOptions) {
         assertMandatoryParameter(isNotBlank(contentId), "contentId");
         assertMandatoryParameter(isNotBlank(attachmentFileName), "attachmentFileName");

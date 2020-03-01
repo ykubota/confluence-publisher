@@ -132,6 +132,25 @@ public class ConfluenceRestClient implements ConfluenceClient {
     }
 
     @Override
+    public String getAncestorIdById(String contentId) throws NotFoundException {
+        HttpGet ancestorsByIdRequest = httpRequestFactory.getAncestorsByIdRequest(contentId);
+
+        return sendRequestAndFailIfNot20x(ancestorsByIdRequest, (response) -> {
+            JsonNode jsonNode = parseJsonResponse(response);
+
+            JsonNode ancestors = jsonNode.get("ancestors");
+            int ancestorIndex = ancestors.size() - 1;
+            if (ancestors.size() < 0) {
+                throw new NotFoundException();
+            }
+
+            String ancestorId = extractIdFromJsonNode(ancestors.get(ancestorIndex));
+            return ancestorId;
+        });
+    }
+
+
+    @Override
     public void addAttachment(String contentId, String attachmentFileName, InputStream attachmentContent) {
         HttpPost addAttachmentRequest = this.httpRequestFactory.addAttachmentRequest(contentId, attachmentFileName, attachmentContent);
         sendRequestAndFailIfNot20x(addAttachmentRequest, (response) -> {

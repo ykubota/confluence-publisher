@@ -32,6 +32,8 @@ public interface ConfluenceClient {
 
     String getPageByTitle(String spaceKey, String title) throws NotFoundException, MultipleResultsException;
 
+    String getAncestorIdById(String contentId) throws NotFoundException;
+
     void addAttachment(String contentId, String attachmentFileName, InputStream attachmentContent);
 
     void updateAttachmentContent(String contentId, String attachmentId, InputStream attachmentContent);
