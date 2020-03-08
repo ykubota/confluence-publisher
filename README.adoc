@@ -4,6 +4,16 @@ image:https://coveralls.io/repos/github/alainsahli/confluence-publisher/badge.sv
 
 = Confluence Publisher
 
+== Difference from the original
+
+* This publisher publishes each file on `asciidocRootFolder` one by one with ignoring directory structure by default.
+** You MUST write `:parent_title: Title of parent page` on asciidoc file subject to publish.
+* If you want to execute as the original, you set `publishEachFile=false`.
+** On this original mode, you can skip deletion of orphaned pages when set `skipDeleteOrphanedPages=true`
+** On this original mode, you can set specify parent page by title (`ancestorTitle`) instead of id (`ancestorId`)
+
+== The following is the original
+
 The Confluence Publisher allows documentation written in AsciiDoc and versioned directly with the documented code base
 to be published to a Confluence space.
 
