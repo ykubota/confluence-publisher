@@ -19,6 +19,7 @@ package org.sahli.asciidoc.confluence.publisher.converter;
 import org.asciidoctor.Asciidoctor;
 import org.asciidoctor.Options;
 import org.asciidoctor.OptionsBuilder;
+import org.asciidoctor.ast.Document;
 import org.sahli.asciidoc.confluence.publisher.converter.AsciidocPagesStructureProvider.AsciidocPage;
 
 import java.io.BufferedReader;
@@ -62,6 +63,7 @@ public class AsciidocConfluencePage {
     private static final Pattern CDATA_PATTERN = compile("<!\\[CDATA\\[.*?\\]\\]>", DOTALL);
     private static final Pattern ATTACHMENT_PATH_PATTERN = compile("<ri:attachment ri:filename=\"(.*?)\"");
     private static final Pattern PAGE_TITLE_PATTERN = compile("<ri:page ri:content-title=\"(.*?)\"");
+    public static final String PARENT_PAGE_TITLE_ATTRIBUTE = "parent_title";
 
     private static final Asciidoctor ASCIIDOCTOR = create();
 
@@ -70,11 +72,13 @@ public class AsciidocConfluencePage {
     }
 
     private final String pageTitle;
+    private final String parentTitle;
     private final String htmlContent;
     private final Map<String, String> attachments;
 
-    private AsciidocConfluencePage(String pageTitle, String htmlContent, Map<String, String> attachments) {
+    private AsciidocConfluencePage(String pageTitle, String parentTitle, String htmlContent, Map<String, String> attachments) {
         this.pageTitle = pageTitle;
+        this.parentTitle = parentTitle;
         this.htmlContent = htmlContent;
         this.attachments = attachments;
     }
@@ -85,6 +89,10 @@ public class AsciidocConfluencePage {
 
     public String pageTitle() {
         return this.pageTitle;
+    }
+
+    public String parentTitle() {
+        return parentTitle;
     }
 
     public Map<String, String> attachments() {
@@ -112,10 +120,11 @@ public class AsciidocConfluencePage {
 
             Options options = options(templatesDir, asciidocPagePath.getParent(), pageAssetsFolder, userAttributes);
             String pageContent = convertedContent(asciidocContent, options, asciidocPagePath, attachmentCollector, pageTitlePostProcessor, sourceEncoding);
-
             String pageTitle = pageTitle(asciidocContent, pageTitlePostProcessor);
 
-            return new AsciidocConfluencePage(pageTitle, pageContent, attachmentCollector);
+            String parentTitle = loadParentTitle(asciidocContent, options);
+
+            return new AsciidocConfluencePage(pageTitle, parentTitle, pageContent, attachmentCollector);
         } catch (IOException e) {
             throw new RuntimeException("Could not create asciidoc confluence page", e);
         }
@@ -134,6 +143,16 @@ public class AsciidocConfluencePage {
         );
 
         return postProcessedContent;
+    }
+
+    private static String loadParentTitle(String adocContent, Options options) {
+        try {
+            Document document = ASCIIDOCTOR.load(adocContent, new HashMap<>());
+            return (String) document.getAttributes().getOrDefault(PARENT_PAGE_TITLE_ATTRIBUTE, "");
+        } catch (Exception ex) {
+            // return no parent title due to parse error
+            return "";
+        }
     }
 
     private static Function<String, String> unescapeCdataHtmlContent() {

@@ -102,7 +102,7 @@ public class FolderBasedAsciidocPagesStructureProvider implements AsciidocPagesS
     }
 
 
-    private static class DefaultAsciidocPage implements AsciidocPage {
+    static class DefaultAsciidocPage implements AsciidocPage {
 
         private final Path path;
         private final List<AsciidocPage> children;
@@ -129,7 +129,7 @@ public class FolderBasedAsciidocPagesStructureProvider implements AsciidocPagesS
     }
 
 
-    private static class DefaultAsciidocPagesStructure implements AsciidocPagesStructure {
+    static class DefaultAsciidocPagesStructure implements AsciidocPagesStructure {
 
         private final List<AsciidocPage> asciidocPages;
 

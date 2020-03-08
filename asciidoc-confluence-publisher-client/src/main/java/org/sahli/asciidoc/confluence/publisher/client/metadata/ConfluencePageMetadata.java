@@ -32,6 +32,7 @@ public class ConfluencePageMetadata {
 
     private String title;
     private String contentFilePath;
+    private String parentTitle;
     private List<ConfluencePageMetadata> children = new ArrayList<>();
     private Map<String, String> attachments = new HashMap<>();
 
@@ -59,6 +60,14 @@ public class ConfluencePageMetadata {
         } else {
             return this.children;
         }
+    }
+
+    public String getParentTitle() {
+        return parentTitle;
+    }
+
+    public void setParentTitle(String parentTitle) {
+        this.parentTitle = parentTitle;
     }
 
     @RuntimeUse
