@@ -38,6 +38,8 @@ import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
 import static org.apache.commons.codec.digest.DigestUtils.sha256Hex;
 import static org.apache.commons.lang.StringUtils.isNotBlank;
+import static org.sahli.asciidoc.confluence.publisher.client.OrphanRemovalStrategy.KEEP_ORPHANS;
+import static org.sahli.asciidoc.confluence.publisher.client.OrphanRemovalStrategy.REMOVE_ORPHANS;
 import static org.sahli.asciidoc.confluence.publisher.client.PublishingStrategy.REPLACE_ANCESTOR;
 import static org.sahli.asciidoc.confluence.publisher.client.utils.AssertUtils.assertMandatoryParameter;
 import static org.sahli.asciidoc.confluence.publisher.client.utils.InputStreamUtils.fileContent;
@@ -53,23 +55,18 @@ public class ConfluencePublisher {
 
     private final ConfluencePublisherMetadata metadata;
     private final PublishingStrategy publishingStrategy;
+    private final OrphanRemovalStrategy orphanRemovalStrategy;
     private final ConfluenceClient confluenceClient;
     private final ConfluencePublisherListener confluencePublisherListener;
-    private final boolean skipDeleteOrphanedPages;
     private final String versionMessage;
 
-    public ConfluencePublisher(ConfluencePublisherMetadata metadata, PublishingStrategy publishingStrategy, ConfluenceClient confluenceClient) {
-        this(metadata, publishingStrategy, confluenceClient, new NoOpConfluencePublisherListener(), false, null);
-    }
-
-    public ConfluencePublisher(ConfluencePublisherMetadata metadata, PublishingStrategy publishingStrategy,
-                               ConfluenceClient confluenceClient, ConfluencePublisherListener confluencePublisherListener,
-                               boolean skipDeleteOrphanedPages, String versionMessage) {
+    public ConfluencePublisher(ConfluencePublisherMetadata metadata, PublishingStrategy publishingStrategy, OrphanRemovalStrategy orphanRemovalStrategy,
+                               ConfluenceClient confluenceClient, ConfluencePublisherListener confluencePublisherListener, String versionMessage) {
         this.metadata = metadata;
         this.publishingStrategy = publishingStrategy;
+        this.orphanRemovalStrategy = orphanRemovalStrategy;
         this.confluenceClient = confluenceClient;
         this.confluencePublisherListener = confluencePublisherListener;
-        this.skipDeleteOrphanedPages = skipDeleteOrphanedPages;
         this.versionMessage = versionMessage;
     }
 
@@ -99,14 +96,14 @@ public class ConfluencePublisher {
                     .map(page -> "'" + page.getTitle() + "'")
                     .collect(joining(", "));
 
-            throw new IllegalArgumentException("Multiple root pages detected: " + rootPageTitles + ", but '" + REPLACE_ANCESTOR + "' publishing strategy only supports one single root page");
+            throw new IllegalArgumentException("Multiple root pages found (" + rootPageTitles + "), but '" + REPLACE_ANCESTOR + "' publishing strategy only supports one single root page");
         }
 
-        if (rootPages.size() == 1) {
-            return rootPages.get(0);
+        if (rootPages.isEmpty()) {
+            throw new IllegalArgumentException("No root page found, but '" + REPLACE_ANCESTOR + "' publishing strategy requires one single root page");
         }
 
-        return null;
+        return rootPages.get(0);
     }
 
     private void startPublishingReplacingAncestorId(ConfluencePageMetadata rootPage, String spaceKey, String ancestorId) {
@@ -123,7 +120,9 @@ public class ConfluencePublisher {
     }
 
     private void startPublishingUnderAncestorId(List<ConfluencePageMetadata> pages, String spaceKey, String ancestorId) {
-        deleteConfluencePagesNotPresentUnderAncestor(pages, ancestorId);
+        if (this.orphanRemovalStrategy == REMOVE_ORPHANS) {
+            deleteConfluencePagesNotPresentUnderAncestor(pages, ancestorId);
+        }
         pages.forEach(page -> {
             String contentId = addOrUpdatePageUnderAncestor(spaceKey, ancestorId, page);
 
@@ -137,9 +136,6 @@ public class ConfluencePublisher {
     }
 
     private void deleteConfluencePagesNotPresentUnderAncestor(List<ConfluencePageMetadata> pagesToKeep, String ancestorId) {
-        if (skipDeleteOrphanedPages) {
-            return;
-        }
         List<ConfluencePage> childPagesOnConfluence = this.confluenceClient.getChildPages(ancestorId);
 
         List<ConfluencePage> childPagesOnConfluenceToDelete = childPagesOnConfluence.stream()
@@ -180,7 +176,7 @@ public class ConfluencePublisher {
         try {
             contentId = this.confluenceClient.getPageByTitle(spaceKey, page.getTitle());
             String existingAncestorId = confluenceClient.getAncestorIdById(contentId);
-            if (skipDeleteOrphanedPages && !ancestorId.equals(existingAncestorId)) {
+            if (orphanRemovalStrategy == KEEP_ORPHANS && !ancestorId.equals(existingAncestorId)) {
                 contentId = replacePage(spaceKey, contentId, ancestorId, page);
             } else {
                 updatePage(contentId, ancestorId, page);
@@ -300,39 +296,6 @@ public class ConfluencePublisher {
         } catch (FileNotFoundException e) {
             throw new RuntimeException("Could not find attachment ", e);
         }
-    }
-
-
-    private static class NoOpConfluencePublisherListener implements ConfluencePublisherListener {
-
-        @Override
-        public void pageAdded(ConfluencePage addedPage) {
-        }
-
-        @Override
-        public void pageUpdated(ConfluencePage existingPage, ConfluencePage updatedPage) {
-        }
-
-        @Override
-        public void pageDeleted(ConfluencePage deletedPage) {
-        }
-
-        @Override
-        public void attachmentAdded(String attachmentFileName, String contentId) {
-        }
-
-        @Override
-        public void attachmentUpdated(String attachmentFileName, String contentId) {
-        }
-
-        @Override
-        public void attachmentDeleted(String attachmentFileName, String contentId) {
-        }
-
-        @Override
-        public void publishCompleted() {
-        }
-
     }
 
 }
