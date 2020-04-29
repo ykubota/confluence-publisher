@@ -35,6 +35,7 @@ public class ConfluencePageMetadata {
     private String parentTitle;
     private List<ConfluencePageMetadata> children = new ArrayList<>();
     private Map<String, String> attachments = new HashMap<>();
+    private List<String> labels = new ArrayList<>();
 
     public String getTitle() {
         return this.title;
@@ -82,6 +83,15 @@ public class ConfluencePageMetadata {
     @RuntimeUse
     public void setAttachments(Map<String, String> attachments) {
         this.attachments = attachments;
+    }
+
+    public List<String> getLabels() {
+        return this.labels;
+    }
+
+    @RuntimeUse
+    public void setLabels(List<String> labels) {
+        this.labels = labels;
     }
 
 }

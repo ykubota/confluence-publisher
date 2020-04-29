@@ -31,7 +31,9 @@ import java.io.InputStreamReader;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.BinaryOperator;
@@ -44,12 +46,15 @@ import static java.nio.file.Files.exists;
 import static java.nio.file.Files.isDirectory;
 import static java.nio.file.Files.newInputStream;
 import static java.util.Arrays.stream;
+import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
+import static java.util.Collections.unmodifiableList;
 import static java.util.Collections.unmodifiableMap;
 import static java.util.regex.Matcher.quoteReplacement;
 import static java.util.regex.Pattern.DOTALL;
 import static java.util.regex.Pattern.compile;
 import static java.util.stream.Collectors.joining;
+import static java.util.stream.Collectors.toList;
 import static org.apache.commons.lang.StringEscapeUtils.unescapeHtml;
 import static org.asciidoctor.Asciidoctor.Factory.create;
 import static org.asciidoctor.SafeMode.UNSAFE;
@@ -75,12 +80,14 @@ public class AsciidocConfluencePage {
     private final String parentTitle;
     private final String htmlContent;
     private final Map<String, String> attachments;
+    private final List<String> keywords;
 
-    private AsciidocConfluencePage(String pageTitle, String parentTitle, String htmlContent, Map<String, String> attachments) {
+    private AsciidocConfluencePage(String pageTitle, String parentTitle, String htmlContent, Map<String, String> attachments, List<String> keywords) {
         this.pageTitle = pageTitle;
         this.parentTitle = parentTitle;
         this.htmlContent = htmlContent;
         this.attachments = attachments;
+        this.keywords = keywords;
     }
 
     public String content() {
@@ -97,6 +104,10 @@ public class AsciidocConfluencePage {
 
     public Map<String, String> attachments() {
         return unmodifiableMap(this.attachments);
+    }
+
+    public List<String> keywords() {
+        return unmodifiableList(this.keywords);
     }
 
     public static AsciidocConfluencePage newAsciidocConfluencePage(AsciidocPage asciidocPage, Charset sourceEncoding, Path templatesDir, Path pageAssetsFolder) {
@@ -121,10 +132,10 @@ public class AsciidocConfluencePage {
             Options options = options(templatesDir, asciidocPagePath.getParent(), pageAssetsFolder, userAttributes);
             String pageContent = convertedContent(asciidocContent, options, asciidocPagePath, attachmentCollector, pageTitlePostProcessor, sourceEncoding);
             String pageTitle = pageTitle(asciidocContent, pageTitlePostProcessor);
-
             String parentTitle = loadParentTitle(asciidocContent, options);
+            List<String> keywords = keywords(asciidocContent);
 
-            return new AsciidocConfluencePage(pageTitle, parentTitle, pageContent, attachmentCollector);
+            return new AsciidocConfluencePage(pageTitle, parentTitle, pageContent, attachmentCollector, keywords);
         } catch (IOException e) {
             throw new RuntimeException("Could not create asciidoc confluence page", e);
         }
@@ -207,6 +218,7 @@ public class AsciidocConfluencePage {
         Map<String, Object> attributes = new HashMap<>(userAttributes);
         attributes.put("imagesoutdir", generatedAssetsTargetFolder.toString());
         attributes.put("outdir", generatedAssetsTargetFolder.toString());
+        attributes.put("source-highlighter", "none");
 
         return OptionsBuilder.options()
                 .backend("xhtml5")
@@ -247,4 +259,14 @@ public class AsciidocConfluencePage {
         }
     }
 
+    private static List<String> keywords(String pageContent) {
+        String keywords = (String) ASCIIDOCTOR.readDocumentHeader(pageContent).getAttributes().get("keywords");
+        if (keywords == null) {
+            return emptyList();
+        }
+
+        return Arrays.stream(keywords.split(","))
+                .map(String::trim)
+                .collect(toList());
+    }
 }

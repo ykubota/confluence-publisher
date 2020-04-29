@@ -45,6 +45,7 @@ import static java.util.Collections.emptyMap;
 import static org.apache.commons.codec.digest.DigestUtils.sha256Hex;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.hasEntry;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
@@ -398,6 +399,26 @@ public class AsciidocConfluencePageTest {
         // assert
         String expectedContent = "<ac:structured-macro ac:name=\"code\">" +
                 "<ac:plain-text-body><![CDATA[[0-9][0-9]\\.[0-9][0-9]\\.[0-9]{4}$]]></ac:plain-text-body>" +
+                "</ac:structured-macro>";
+        assertThat(asciiDocConfluencePage.content(), is(expectedContent));
+    }
+
+    @Test
+    public void renderConfluencePage_asciiDocWithSourceListingAndSourceHighlighter_returnsConfluencePageContentWithoutSourceHighlighting() {
+        // arrange
+        String adocContent = ":source-highlighter: coderay\n" +
+                "[source,java]\n" +
+                "----\n" +
+                "import java.util.List;\n" +
+                "----";
+
+        // act
+        AsciidocConfluencePage asciiDocConfluencePage = newAsciidocConfluencePage(asciidocPage(prependTitle(adocContent)), UTF_8, TEMPLATES_FOLDER, dummyAssetsTargetPath());
+
+        // assert
+        String expectedContent = "<ac:structured-macro ac:name=\"code\">" +
+                "<ac:parameter ac:name=\"language\">java</ac:parameter>" +
+                "<ac:plain-text-body><![CDATA[import java.util.List;]]></ac:plain-text-body>" +
                 "</ac:structured-macro>";
         assertThat(asciiDocConfluencePage.content(), is(expectedContent));
     }
@@ -1488,10 +1509,42 @@ public class AsciidocConfluencePageTest {
         // act
         AsciidocConfluencePage asciidocConfluencePage = newAsciidocConfluencePage(asciidocPage, UTF_8, TEMPLATES_FOLDER, dummyAssetsTargetPath());
 
-        // assert
         assertThat(asciidocConfluencePage.attachments().size(), is(2));
         assertThat(asciidocConfluencePage.attachments(), hasEntry("sunrise.jpg", "sunrise.jpg"));
         assertThat(asciidocConfluencePage.attachments(), hasEntry("foo.txt", "foo.txt"));
+    }
+
+    @Test
+    public void keywords_singleKeyword_returnsSingleKeyword() {
+        // arrange
+        String adoc = "= Page Title\n"
+                + ":keywords: foo";
+
+        AsciidocPage asciidocPage = asciidocPage(adoc);
+
+        // act
+        AsciidocConfluencePage asciidocConfluencePage = newAsciidocConfluencePage(asciidocPage, UTF_8, TEMPLATES_FOLDER, dummyAssetsTargetPath());
+
+        // assert
+        assertThat(asciidocConfluencePage.keywords().size(), is(1));
+        assertThat(asciidocConfluencePage.keywords(), hasItem("foo"));
+    }
+
+    @Test
+    public void keywords_multipleKeywords_returnAllKeywords() {
+        // arrange
+        String adoc = "= Page Title\n"
+                + ":keywords: foo, bar";
+
+        AsciidocPage asciidocPage = asciidocPage(adoc);
+
+        // act
+        AsciidocConfluencePage asciidocConfluencePage = newAsciidocConfluencePage(asciidocPage, UTF_8, TEMPLATES_FOLDER, dummyAssetsTargetPath());
+
+        // assert
+        assertThat(asciidocConfluencePage.keywords().size(), is(2));
+        assertThat(asciidocConfluencePage.keywords(), hasItem("foo"));
+        assertThat(asciidocConfluencePage.keywords(), hasItem("bar"));
     }
 
     private static String prependTitle(String content) {
