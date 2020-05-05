@@ -1,0 +1,6 @@
+= Test Page 2
+:parent_title: TopPage2
+
+== Test2
+
+<<test.adoc#, testAdoc>>

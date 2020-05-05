@@ -1,0 +1,6 @@
+= Alpha
+:parent_title: Sample
+:sectlinks:
+:sectanchors:
+
+ALPHA

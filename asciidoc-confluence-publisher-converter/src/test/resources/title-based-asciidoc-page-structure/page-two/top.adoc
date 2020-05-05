@@ -1,0 +1,9 @@
+= Sample
+:parent_title: Top Base
+:sectlinks:
+:sectanchors:
+
+* <<alpha.adoc#, ALPHA chapter>>
+* <<beta.adoc#, BETA chapter>>
+* <<gamma.adoc#, GAMMA chapter>>
+* <<../page-one/page1.adoc#, page-one>>

@@ -133,7 +133,6 @@ public final class AsciidocConfluenceConverter {
     private static ConfluencePageMetadata buildConfluencePageMetadata(AsciidocConfluencePage asciidocConfluencePage, Path contentFileTargetPath, List<ConfluencePageMetadata> childConfluencePages, List<AttachmentMetadata> attachments) {
         ConfluencePageMetadata confluencePageMetadata = new ConfluencePageMetadata();
         confluencePageMetadata.setTitle(asciidocConfluencePage.pageTitle());
-        confluencePageMetadata.setParentTitle(asciidocConfluencePage.parentTitle());
         confluencePageMetadata.setContentFilePath(contentFileTargetPath.toAbsolutePath().toString());
         confluencePageMetadata.setChildren(childConfluencePages);
         confluencePageMetadata.getAttachments().putAll(toTargetAttachmentFileNameAndAttachmentPath(attachments));

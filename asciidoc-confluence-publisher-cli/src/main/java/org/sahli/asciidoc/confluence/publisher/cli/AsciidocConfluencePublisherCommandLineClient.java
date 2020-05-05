@@ -18,6 +18,7 @@ package org.sahli.asciidoc.confluence.publisher.cli;
 
 import org.sahli.asciidoc.confluence.publisher.client.ConfluencePublisher;
 import org.sahli.asciidoc.confluence.publisher.client.ConfluencePublisherListener;
+import org.sahli.asciidoc.confluence.publisher.client.DirectoryStructureStrategy;
 import org.sahli.asciidoc.confluence.publisher.client.OrphanRemovalStrategy;
 import org.sahli.asciidoc.confluence.publisher.client.PublishingStrategy;
 import org.sahli.asciidoc.confluence.publisher.client.http.ConfluencePage;
@@ -26,17 +27,15 @@ import org.sahli.asciidoc.confluence.publisher.client.http.ConfluenceRestClient.
 import org.sahli.asciidoc.confluence.publisher.client.http.NotFoundException;
 import org.sahli.asciidoc.confluence.publisher.client.metadata.ConfluencePublisherMetadata;
 import org.sahli.asciidoc.confluence.publisher.converter.AsciidocConfluenceConverter;
-import org.sahli.asciidoc.confluence.publisher.converter.AsciidocConfluencePage;
 import org.sahli.asciidoc.confluence.publisher.converter.AsciidocPagesStructureProvider;
 import org.sahli.asciidoc.confluence.publisher.converter.FolderBasedAsciidocPagesStructureProvider;
 import org.sahli.asciidoc.confluence.publisher.converter.PageTitlePostProcessor;
 import org.sahli.asciidoc.confluence.publisher.converter.PrefixAndSuffixPageTitlePostProcessor;
-import org.sahli.asciidoc.confluence.publisher.converter.SingleAsciidocPageStructureProvider;
+import org.sahli.asciidoc.confluence.publisher.converter.TitleBasedAsciidocPageStructureProvider;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.FileVisitResult;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
@@ -49,7 +48,8 @@ import static java.nio.file.FileVisitResult.CONTINUE;
 import static java.nio.file.Files.createTempDirectory;
 import static java.nio.file.Files.delete;
 import static java.nio.file.Files.walkFileTree;
-import static org.sahli.asciidoc.confluence.publisher.client.OrphanRemovalStrategy.KEEP_ORPHANS;
+import static org.sahli.asciidoc.confluence.publisher.client.DirectoryStructureStrategy.FOLDER_BASE;
+import static org.sahli.asciidoc.confluence.publisher.client.DirectoryStructureStrategy.TITLE_BASE;
 import static org.sahli.asciidoc.confluence.publisher.client.OrphanRemovalStrategy.REMOVE_ORPHANS;
 import static org.sahli.asciidoc.confluence.publisher.client.PublishingStrategy.APPEND_TO_ANCESTOR;
 
@@ -67,6 +67,7 @@ public class AsciidocConfluencePublisherCommandLineClient {
         String versionMessage = argumentsParser.optionalArgument("versionMessage", args).orElse(null);
         PublishingStrategy publishingStrategy = PublishingStrategy.valueOf(argumentsParser.optionalArgument("publishingStrategy", args).orElse(APPEND_TO_ANCESTOR.name()));
         OrphanRemovalStrategy orphanRemovalStrategy = OrphanRemovalStrategy.valueOf(argumentsParser.optionalArgument("orphanRemovalStrategy", args).orElse(REMOVE_ORPHANS.name()));
+        DirectoryStructureStrategy directoryStructureStrategy = DirectoryStructureStrategy.valueOf(argumentsParser.optionalArgument("directoryStructureStrategy", args).orElse(FOLDER_BASE.name()));
 
         Path documentationRootFolder = Paths.get(argumentsParser.mandatoryArgument("asciidocRootFolder", args));
         Path buildFolder = createTempDirectory("confluence-publisher");
@@ -82,41 +83,20 @@ public class AsciidocConfluencePublisherCommandLineClient {
         String proxyUsername = argumentsParser.optionalArgument("proxyUsername", args).orElse(null);
         String proxyPassword = argumentsParser.optionalArgument("proxyPassword", args).orElse(null);
 
-        boolean eachFileMode = argumentsParser.optionalBooleanArgument("publishEachFile", args).orElse(true);
-
         try {
-            AsciidocPagesStructureProvider asciidocPagesStructureProvider = new FolderBasedAsciidocPagesStructureProvider(documentationRootFolder, sourceEncoding);
             PageTitlePostProcessor pageTitlePostProcessor = new PrefixAndSuffixPageTitlePostProcessor(prefix, suffix);
-
             ProxyConfiguration proxyConfiguration = new ProxyConfiguration(proxyScheme, proxyHost, proxyPort, proxyUsername, proxyPassword);
             ConfluenceRestClient confluenceClient = new ConfluenceRestClient(rootConfluenceUrl, proxyConfiguration, skipSslVerification, username, password);
 
-            if (eachFileMode) {
-                AsciidocConfluenceConverter asciidocConfluenceConverter = new AsciidocConfluenceConverter(spaceKey, "");
-                Files.walk(documentationRootFolder)
-                     .filter(AsciidocValidator::validate)
-                     .forEach(path -> {
-                         SingleAsciidocPageStructureProvider provider = new SingleAsciidocPageStructureProvider(path, sourceEncoding);
-                         ConfluencePublisherMetadata confluencePublisherMetadata = asciidocConfluenceConverter.convert(provider, pageTitlePostProcessor, buildFolder, attributes);
-                         if (confluencePublisherMetadata.getPages().size() != 1) {
-                             throw new RuntimeException("Parsed multiple pages at once despite each-file mode when read file: " + path);
-                         }
-                         String parentTitle = confluencePublisherMetadata.getPages().get(0).getParentTitle();
-                         if (parentTitle.isEmpty()) {
-                             System.out.println("Asciidoc file (" + path + ") doesn't have :" + AsciidocConfluencePage.PARENT_PAGE_TITLE_ATTRIBUTE
-                                                + ": attribute. Skipped.");
-                         } else {
-                             try {
-                                 String parentId = confluenceClient.getPageByTitle(spaceKey, parentTitle);
-                                 confluencePublisherMetadata.setAncestorId(parentId);
-                                 ConfluencePublisher confluencePublisher = new ConfluencePublisher(confluencePublisherMetadata, publishingStrategy, KEEP_ORPHANS, confluenceClient, new SystemOutLoggingConfluencePublisherListener(), versionMessage);
-                                 confluencePublisher.publish();
-                             } catch (NotFoundException e) {
-                                 throw new IllegalArgumentException(
-                                         "Could not find the parent page being entitled: " + parentTitle, e);
-                             }
-                         }
-                     });
+            if (directoryStructureStrategy == TITLE_BASE) {
+                TitleBasedAsciidocPageStructureProvider provider = new TitleBasedAsciidocPageStructureProvider(documentationRootFolder, sourceEncoding);
+                for (Map.Entry<String, FolderBasedAsciidocPagesStructureProvider> e : provider.provides().entrySet()) {
+                    ancestorId = confluenceClient.getPageByTitle(spaceKey, e.getKey());
+                    AsciidocConfluenceConverter asciidocConfluenceConverter = new AsciidocConfluenceConverter(spaceKey, ancestorId);
+                    ConfluencePublisherMetadata confluencePublisherMetadata = asciidocConfluenceConverter.convert(e.getValue(), pageTitlePostProcessor, buildFolder, attributes);
+                    ConfluencePublisher confluencePublisher = new ConfluencePublisher(confluencePublisherMetadata, publishingStrategy, orphanRemovalStrategy, confluenceClient, new SystemOutLoggingConfluencePublisherListener(), versionMessage);
+                    confluencePublisher.publish();
+                }
             } else {
                 if (ancestorId == null) {
                     if (ancestorTitle == null) {
@@ -128,6 +108,7 @@ public class AsciidocConfluencePublisherCommandLineClient {
                         throw new IllegalArgumentException("Could not find the parent page being entitled: " + ancestorTitle, e);
                     }
                 }
+                AsciidocPagesStructureProvider asciidocPagesStructureProvider = new FolderBasedAsciidocPagesStructureProvider(documentationRootFolder, sourceEncoding);
                 AsciidocConfluenceConverter asciidocConfluenceConverter = new AsciidocConfluenceConverter(spaceKey, ancestorId);
                 ConfluencePublisherMetadata confluencePublisherMetadata = asciidocConfluenceConverter.convert(asciidocPagesStructureProvider, pageTitlePostProcessor, buildFolder, attributes);
 

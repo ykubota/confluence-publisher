@@ -16,29 +16,29 @@
 
 package org.sahli.asciidoc.confluence.publisher.converter;
 
+import static java.nio.file.Files.walk;
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
+
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import static java.nio.file.Files.walk;
-import static java.util.Collections.unmodifiableList;
-import static java.util.stream.Collectors.toList;
-import static java.util.stream.Collectors.toMap;
-
-public class FolderBasedAsciidocPagesStructureProvider implements AsciidocPagesStructureProvider {
-
-    private static final String ADOC_FILE_EXTENSION = ".adoc";
-    private static final String INCLUDE_FILE_PREFIX = "_";
+public class FolderBasedAsciidocPagesStructureProvider extends DefaultAsciidocPagesStructureProvider {
 
     private final AsciidocPagesStructure structure;
     private final Charset sourceEncoding;
 
     public FolderBasedAsciidocPagesStructureProvider(Path documentationRootFolder, Charset sourceEncoding) {
         this.structure = buildStructure(documentationRootFolder);
+        this.sourceEncoding = sourceEncoding;
+    }
+
+    public FolderBasedAsciidocPagesStructureProvider(AsciidocPagesStructure structure, Charset sourceEncoding) {
+        this.structure = structure;
         this.sourceEncoding = sourceEncoding;
     }
 
@@ -79,7 +79,7 @@ public class FolderBasedAsciidocPagesStructureProvider implements AsciidocPagesS
 
     private static Map<Path, DefaultAsciidocPage> indexAsciidocPagesByFolderPath(Path documentationRootFolder) throws IOException {
         return walk(documentationRootFolder)
-                .filter((path) -> isAdocFile(path) && !isIncludeFile(path))
+                .filter((path) -> validateAdocFile(path))
                 .collect(toMap((asciidocPagePath) -> removeExtension(asciidocPagePath), (asciidocPagePath) -> new DefaultAsciidocPage(asciidocPagePath)));
     }
 
@@ -88,60 +88,4 @@ public class FolderBasedAsciidocPagesStructureProvider implements AsciidocPagesS
                 .filter((asciidocPage) -> asciidocPage.path().equals(documentationRootFolder.resolve(asciidocPage.path().getFileName())))
                 .collect(toList());
     }
-
-    private static Path removeExtension(Path path) {
-        return Paths.get(path.toString().substring(0, path.toString().lastIndexOf('.')));
-    }
-
-    private static boolean isAdocFile(Path file) {
-        return file.toString().endsWith(ADOC_FILE_EXTENSION);
-    }
-
-    private static boolean isIncludeFile(Path file) {
-        return file.getFileName().toString().startsWith(INCLUDE_FILE_PREFIX);
-    }
-
-
-    static class DefaultAsciidocPage implements AsciidocPage {
-
-        private final Path path;
-        private final List<AsciidocPage> children;
-
-        DefaultAsciidocPage(Path path) {
-            this.path = path;
-            this.children = new ArrayList<>();
-        }
-
-        void addChild(AsciidocPage child) {
-            this.children.add(child);
-        }
-
-        @Override
-        public Path path() {
-            return this.path;
-        }
-
-        @Override
-        public List<AsciidocPage> children() {
-            return unmodifiableList(this.children);
-        }
-
-    }
-
-
-    static class DefaultAsciidocPagesStructure implements AsciidocPagesStructure {
-
-        private final List<AsciidocPage> asciidocPages;
-
-        DefaultAsciidocPagesStructure(List<AsciidocPage> asciidocPages) {
-            this.asciidocPages = asciidocPages;
-        }
-
-        @Override
-        public List<AsciidocPage> pages() {
-            return this.asciidocPages;
-        }
-
-    }
-
 }

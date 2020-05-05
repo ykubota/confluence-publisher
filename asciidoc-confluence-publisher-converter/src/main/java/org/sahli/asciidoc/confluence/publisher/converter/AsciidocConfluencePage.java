@@ -77,14 +77,12 @@ public class AsciidocConfluencePage {
     }
 
     private final String pageTitle;
-    private final String parentTitle;
     private final String htmlContent;
     private final Map<String, String> attachments;
     private final List<String> keywords;
 
-    private AsciidocConfluencePage(String pageTitle, String parentTitle, String htmlContent, Map<String, String> attachments, List<String> keywords) {
+    private AsciidocConfluencePage(String pageTitle, String htmlContent, Map<String, String> attachments, List<String> keywords) {
         this.pageTitle = pageTitle;
-        this.parentTitle = parentTitle;
         this.htmlContent = htmlContent;
         this.attachments = attachments;
         this.keywords = keywords;
@@ -96,10 +94,6 @@ public class AsciidocConfluencePage {
 
     public String pageTitle() {
         return this.pageTitle;
-    }
-
-    public String parentTitle() {
-        return parentTitle;
     }
 
     public Map<String, String> attachments() {
@@ -132,12 +126,29 @@ public class AsciidocConfluencePage {
             Options options = options(templatesDir, asciidocPagePath.getParent(), pageAssetsFolder, userAttributes);
             String pageContent = convertedContent(asciidocContent, options, asciidocPagePath, attachmentCollector, pageTitlePostProcessor, sourceEncoding);
             String pageTitle = pageTitle(asciidocContent, pageTitlePostProcessor);
-            String parentTitle = loadParentTitle(asciidocContent, options);
             List<String> keywords = keywords(asciidocContent);
 
-            return new AsciidocConfluencePage(pageTitle, parentTitle, pageContent, attachmentCollector, keywords);
+            return new AsciidocConfluencePage(pageTitle, pageContent, attachmentCollector, keywords);
         } catch (IOException e) {
             throw new RuntimeException("Could not create asciidoc confluence page", e);
+        }
+    }
+
+    public static String fetchParentTitle(Path asciidocFilePath, Charset sourceEncoding) {
+        try {
+            Document document = ASCIIDOCTOR.load(readIntoString(newInputStream(asciidocFilePath), sourceEncoding), new HashMap<>());
+            return (String) document.getAttributes().getOrDefault(PARENT_PAGE_TITLE_ATTRIBUTE, "");
+        } catch(IOException e) {
+            throw new RuntimeException("Could not load asciidoc file", e);
+        }
+    }
+
+    public static String fetchTitle(Path asciidocFilePath, Charset sourceEncoding) {
+        try {
+            Document document = ASCIIDOCTOR.load(readIntoString(newInputStream(asciidocFilePath), sourceEncoding), new HashMap<>());
+            return document.doctitle();
+        } catch(IOException e) {
+            throw new RuntimeException("Could not load asciidoc file", e);
         }
     }
 
@@ -154,16 +165,6 @@ public class AsciidocConfluencePage {
         );
 
         return postProcessedContent;
-    }
-
-    private static String loadParentTitle(String adocContent, Options options) {
-        try {
-            Document document = ASCIIDOCTOR.load(adocContent, new HashMap<>());
-            return (String) document.getAttributes().getOrDefault(PARENT_PAGE_TITLE_ATTRIBUTE, "");
-        } catch (Exception ex) {
-            // return no parent title due to parse error
-            return "";
-        }
     }
 
     private static Function<String, String> unescapeCdataHtmlContent() {

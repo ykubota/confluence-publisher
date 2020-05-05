@@ -1,0 +1,6 @@
+= GAMMA
+:parent_title: Sample
+:sectlinks:
+:sectanchors:
+
+GAMMA

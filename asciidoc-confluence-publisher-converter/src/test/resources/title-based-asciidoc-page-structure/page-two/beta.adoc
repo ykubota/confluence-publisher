@@ -1,0 +1,6 @@
+= BETA
+:parent_title: Sample
+:sectlinks:
+:sectanchors:
+
+BETA
