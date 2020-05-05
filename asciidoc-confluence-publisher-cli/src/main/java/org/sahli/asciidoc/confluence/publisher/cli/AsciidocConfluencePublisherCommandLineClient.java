@@ -18,6 +18,7 @@ package org.sahli.asciidoc.confluence.publisher.cli;
 
 import org.sahli.asciidoc.confluence.publisher.client.ConfluencePublisher;
 import org.sahli.asciidoc.confluence.publisher.client.ConfluencePublisherListener;
+import org.sahli.asciidoc.confluence.publisher.client.DirectoryStructureStrategy;
 import org.sahli.asciidoc.confluence.publisher.client.OrphanRemovalStrategy;
 import org.sahli.asciidoc.confluence.publisher.client.PublishingStrategy;
 import org.sahli.asciidoc.confluence.publisher.client.http.ConfluencePage;
@@ -28,6 +29,7 @@ import org.sahli.asciidoc.confluence.publisher.client.metadata.ConfluencePublish
 import org.sahli.asciidoc.confluence.publisher.converter.AsciidocConfluenceConverter;
 import org.sahli.asciidoc.confluence.publisher.converter.AsciidocConfluencePage;
 import org.sahli.asciidoc.confluence.publisher.converter.AsciidocPagesStructureProvider;
+import org.sahli.asciidoc.confluence.publisher.converter.AsciidocValidator;
 import org.sahli.asciidoc.confluence.publisher.converter.FolderBasedAsciidocPagesStructureProvider;
 import org.sahli.asciidoc.confluence.publisher.converter.PageTitlePostProcessor;
 import org.sahli.asciidoc.confluence.publisher.converter.PrefixAndSuffixPageTitlePostProcessor;
@@ -49,6 +51,7 @@ import static java.nio.file.FileVisitResult.CONTINUE;
 import static java.nio.file.Files.createTempDirectory;
 import static java.nio.file.Files.delete;
 import static java.nio.file.Files.walkFileTree;
+import static org.sahli.asciidoc.confluence.publisher.client.DirectoryStructureStrategy.FOLDER_BASE;
 import static org.sahli.asciidoc.confluence.publisher.client.OrphanRemovalStrategy.KEEP_ORPHANS;
 import static org.sahli.asciidoc.confluence.publisher.client.OrphanRemovalStrategy.REMOVE_ORPHANS;
 import static org.sahli.asciidoc.confluence.publisher.client.PublishingStrategy.APPEND_TO_ANCESTOR;
@@ -67,6 +70,7 @@ public class AsciidocConfluencePublisherCommandLineClient {
         String versionMessage = argumentsParser.optionalArgument("versionMessage", args).orElse(null);
         PublishingStrategy publishingStrategy = PublishingStrategy.valueOf(argumentsParser.optionalArgument("publishingStrategy", args).orElse(APPEND_TO_ANCESTOR.name()));
         OrphanRemovalStrategy orphanRemovalStrategy = OrphanRemovalStrategy.valueOf(argumentsParser.optionalArgument("orphanRemovalStrategy", args).orElse(REMOVE_ORPHANS.name()));
+        DirectoryStructureStrategy directoryStructureStrategy = DirectoryStructureStrategy.valueOf(argumentsParser.optionalArgument("directoryStructurerStrategy", args).orElse(FOLDER_BASE.name()));
 
         Path documentationRootFolder = Paths.get(argumentsParser.mandatoryArgument("asciidocRootFolder", args));
         Path buildFolder = createTempDirectory("confluence-publisher");
@@ -94,7 +98,7 @@ public class AsciidocConfluencePublisherCommandLineClient {
             if (eachFileMode) {
                 AsciidocConfluenceConverter asciidocConfluenceConverter = new AsciidocConfluenceConverter(spaceKey, "");
                 Files.walk(documentationRootFolder)
-                     .filter(AsciidocValidator::validate)
+                     // .filter(AsciidocValidator::validate)
                      .forEach(path -> {
                          SingleAsciidocPageStructureProvider provider = new SingleAsciidocPageStructureProvider(path, sourceEncoding);
                          ConfluencePublisherMetadata confluencePublisherMetadata = asciidocConfluenceConverter.convert(provider, pageTitlePostProcessor, buildFolder, attributes);

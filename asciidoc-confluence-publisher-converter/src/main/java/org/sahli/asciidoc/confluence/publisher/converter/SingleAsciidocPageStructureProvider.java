@@ -4,10 +4,7 @@ import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.Collections;
 
-import org.sahli.asciidoc.confluence.publisher.converter.FolderBasedAsciidocPagesStructureProvider.DefaultAsciidocPage;
-import org.sahli.asciidoc.confluence.publisher.converter.FolderBasedAsciidocPagesStructureProvider.DefaultAsciidocPagesStructure;
-
-public class SingleAsciidocPageStructureProvider implements AsciidocPagesStructureProvider {
+public class SingleAsciidocPageStructureProvider extends DefaultAsciidocPagesStructureProvider {
 
     private final AsciidocPagesStructure structure;
     private final Charset sourceEncoding;

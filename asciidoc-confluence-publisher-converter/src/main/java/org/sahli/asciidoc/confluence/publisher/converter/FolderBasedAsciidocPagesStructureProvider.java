@@ -16,6 +16,10 @@
 
 package org.sahli.asciidoc.confluence.publisher.converter;
 
+import static java.nio.file.Files.walk;
+import static java.util.stream.Collectors.toList;
+import static java.util.stream.Collectors.toMap;
+
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
@@ -24,12 +28,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import static java.nio.file.Files.walk;
-import static java.util.Collections.unmodifiableList;
-import static java.util.stream.Collectors.toList;
-import static java.util.stream.Collectors.toMap;
-
-public class FolderBasedAsciidocPagesStructureProvider implements AsciidocPagesStructureProvider {
+public class FolderBasedAsciidocPagesStructureProvider extends DefaultAsciidocPagesStructureProvider {
 
     private static final String ADOC_FILE_EXTENSION = ".adoc";
     private static final String INCLUDE_FILE_PREFIX = "_";
@@ -99,49 +98,6 @@ public class FolderBasedAsciidocPagesStructureProvider implements AsciidocPagesS
 
     private static boolean isIncludeFile(Path file) {
         return file.getFileName().toString().startsWith(INCLUDE_FILE_PREFIX);
-    }
-
-
-    static class DefaultAsciidocPage implements AsciidocPage {
-
-        private final Path path;
-        private final List<AsciidocPage> children;
-
-        DefaultAsciidocPage(Path path) {
-            this.path = path;
-            this.children = new ArrayList<>();
-        }
-
-        void addChild(AsciidocPage child) {
-            this.children.add(child);
-        }
-
-        @Override
-        public Path path() {
-            return this.path;
-        }
-
-        @Override
-        public List<AsciidocPage> children() {
-            return unmodifiableList(this.children);
-        }
-
-    }
-
-
-    static class DefaultAsciidocPagesStructure implements AsciidocPagesStructure {
-
-        private final List<AsciidocPage> asciidocPages;
-
-        DefaultAsciidocPagesStructure(List<AsciidocPage> asciidocPages) {
-            this.asciidocPages = asciidocPages;
-        }
-
-        @Override
-        public List<AsciidocPage> pages() {
-            return this.asciidocPages;
-        }
-
     }
 
 }

@@ -1,4 +1,4 @@
-package org.sahli.asciidoc.confluence.publisher.cli;
+package org.sahli.asciidoc.confluence.publisher.converter;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
