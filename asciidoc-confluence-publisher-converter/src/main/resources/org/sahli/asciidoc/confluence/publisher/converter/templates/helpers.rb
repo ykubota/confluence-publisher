@@ -178,4 +178,9 @@ module Slim::Helpers
     end
   end
 
+  # remove callout number markup because Confluence's code block doesn't support
+  def remove_callout_markup str
+    str.gsub(/<b class="conum">([^<]+)<\/b>/, "\\1")
+  end
+
 end

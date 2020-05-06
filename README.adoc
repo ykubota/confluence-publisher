@@ -7,6 +7,7 @@ origin: https://github.com/confluence-publisher/confluence-publisher
 * This publisher publishes each file on `asciidocRootFolder` with ignoring directory structure by using `directoryStructureStrategy=TITLE_BASE`.
 ** You MUST write `:parent_title: Title of parent page` on asciidoc file subject to publish when using this strategy.
 * You can set specify parent page by title (`ancestorTitle`) instead of id (`ancestorId`)
+* Disable link:https://asciidoctor.org/docs/user-manual/#callouts[markup of callout numbers] because Confluence's code block doesn't support.
 
 == The following is the original
 
