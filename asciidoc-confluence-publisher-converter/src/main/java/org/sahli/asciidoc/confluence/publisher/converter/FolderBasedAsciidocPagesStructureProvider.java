@@ -23,15 +23,11 @@ import static java.util.stream.Collectors.toMap;
 import java.io.IOException;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 public class FolderBasedAsciidocPagesStructureProvider extends DefaultAsciidocPagesStructureProvider {
-
-    private static final String ADOC_FILE_EXTENSION = ".adoc";
-    private static final String INCLUDE_FILE_PREFIX = "_";
 
     private final AsciidocPagesStructure structure;
     private final Charset sourceEncoding;
@@ -78,7 +74,7 @@ public class FolderBasedAsciidocPagesStructureProvider extends DefaultAsciidocPa
 
     private static Map<Path, DefaultAsciidocPage> indexAsciidocPagesByFolderPath(Path documentationRootFolder) throws IOException {
         return walk(documentationRootFolder)
-                .filter((path) -> isAdocFile(path) && !isIncludeFile(path))
+                .filter((path) -> validateAdocFile(path))
                 .collect(toMap((asciidocPagePath) -> removeExtension(asciidocPagePath), (asciidocPagePath) -> new DefaultAsciidocPage(asciidocPagePath)));
     }
 
@@ -87,17 +83,4 @@ public class FolderBasedAsciidocPagesStructureProvider extends DefaultAsciidocPa
                 .filter((asciidocPage) -> asciidocPage.path().equals(documentationRootFolder.resolve(asciidocPage.path().getFileName())))
                 .collect(toList());
     }
-
-    private static Path removeExtension(Path path) {
-        return Paths.get(path.toString().substring(0, path.toString().lastIndexOf('.')));
-    }
-
-    private static boolean isAdocFile(Path file) {
-        return file.toString().endsWith(ADOC_FILE_EXTENSION);
-    }
-
-    private static boolean isIncludeFile(Path file) {
-        return file.getFileName().toString().startsWith(INCLUDE_FILE_PREFIX);
-    }
-
 }

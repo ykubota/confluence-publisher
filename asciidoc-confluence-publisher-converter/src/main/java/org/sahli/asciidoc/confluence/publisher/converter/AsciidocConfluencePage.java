@@ -132,12 +132,30 @@ public class AsciidocConfluencePage {
             Options options = options(templatesDir, asciidocPagePath.getParent(), pageAssetsFolder, userAttributes);
             String pageContent = convertedContent(asciidocContent, options, asciidocPagePath, attachmentCollector, pageTitlePostProcessor, sourceEncoding);
             String pageTitle = pageTitle(asciidocContent, pageTitlePostProcessor);
-            String parentTitle = loadParentTitle(asciidocContent, options);
+            String parentTitle = loadParentTitle(asciidocContent);
             List<String> keywords = keywords(asciidocContent);
 
             return new AsciidocConfluencePage(pageTitle, parentTitle, pageContent, attachmentCollector, keywords);
         } catch (IOException e) {
             throw new RuntimeException("Could not create asciidoc confluence page", e);
+        }
+    }
+
+    public static String parseParentTitle(Path asciidocFilePath, Charset sourceEncoding) {
+        try {
+            Document document = ASCIIDOCTOR.load(readIntoString(newInputStream(asciidocFilePath), sourceEncoding), new HashMap<>());
+            return (String) document.getAttributes().getOrDefault(PARENT_PAGE_TITLE_ATTRIBUTE, "");
+        } catch(IOException e) {
+            throw new RuntimeException("Could not load asciidoc file", e);
+        }
+    }
+
+    public static String parseTitle(Path asciidocFilePath, Charset sourceEncoding) {
+        try {
+            Document document = ASCIIDOCTOR.load(readIntoString(newInputStream(asciidocFilePath), sourceEncoding), new HashMap<>());
+            return document.doctitle();
+        } catch(IOException e) {
+            throw new RuntimeException("Could not load asciidoc file", e);
         }
     }
 
@@ -156,7 +174,7 @@ public class AsciidocConfluencePage {
         return postProcessedContent;
     }
 
-    private static String loadParentTitle(String adocContent, Options options) {
+    private static String loadParentTitle(String adocContent) {
         try {
             Document document = ASCIIDOCTOR.load(adocContent, new HashMap<>());
             return (String) document.getAttributes().getOrDefault(PARENT_PAGE_TITLE_ATTRIBUTE, "");

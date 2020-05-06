@@ -3,11 +3,16 @@ package org.sahli.asciidoc.confluence.publisher.converter;
 import static java.util.Collections.unmodifiableList;
 
 import java.nio.charset.Charset;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
 public class DefaultAsciidocPagesStructureProvider implements AsciidocPagesStructureProvider {
+
+    private static final String ADOC_FILE_EXTENSION = ".adoc";
+    private static final String INCLUDE_FILE_PREFIX = "_";
 
     final AsciidocPagesStructure structure;
     final Charset sourceEncoding;
@@ -29,6 +34,22 @@ public class DefaultAsciidocPagesStructureProvider implements AsciidocPagesStruc
     @Override
     public Charset sourceEncoding() {
         return sourceEncoding;
+    }
+
+    static Path removeExtension(Path path) {
+        return Paths.get(path.toString().substring(0, path.toString().lastIndexOf('.')));
+    }
+
+    static boolean validateAdocFile(Path path) {
+        return Files.isRegularFile(path) && isAdocFile(path) && !isIncludeFile(path);
+    }
+
+    private static boolean isAdocFile(Path file) {
+        return file.toString().endsWith(ADOC_FILE_EXTENSION);
+    }
+
+    private static boolean isIncludeFile(Path file) {
+        return file.getFileName().toString().startsWith(INCLUDE_FILE_PREFIX);
     }
 
     public static class DefaultAsciidocPagesStructure implements AsciidocPagesStructure {
@@ -71,5 +92,4 @@ public class DefaultAsciidocPagesStructureProvider implements AsciidocPagesStruc
         }
 
     }
-
 }

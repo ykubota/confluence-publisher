@@ -34,6 +34,7 @@ import org.sahli.asciidoc.confluence.publisher.converter.FolderBasedAsciidocPage
 import org.sahli.asciidoc.confluence.publisher.converter.PageTitlePostProcessor;
 import org.sahli.asciidoc.confluence.publisher.converter.PrefixAndSuffixPageTitlePostProcessor;
 import org.sahli.asciidoc.confluence.publisher.converter.SingleAsciidocPageStructureProvider;
+import org.sahli.asciidoc.confluence.publisher.converter.DefaultAsciidocPagesStructureProvider.DefaultAsciidocPage;
 
 import java.io.IOException;
 import java.nio.charset.Charset;
@@ -44,6 +45,8 @@ import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static java.lang.Integer.parseInt;
@@ -95,31 +98,26 @@ public class AsciidocConfluencePublisherCommandLineClient {
             ProxyConfiguration proxyConfiguration = new ProxyConfiguration(proxyScheme, proxyHost, proxyPort, proxyUsername, proxyPassword);
             ConfluenceRestClient confluenceClient = new ConfluenceRestClient(rootConfluenceUrl, proxyConfiguration, skipSslVerification, username, password);
 
-            if (eachFileMode) {
+            if (directoryStructureStrategy == DirectoryStructureStrategy.SCATTERED) {
                 AsciidocConfluenceConverter asciidocConfluenceConverter = new AsciidocConfluenceConverter(spaceKey, "");
                 Files.walk(documentationRootFolder)
-                     // .filter(AsciidocValidator::validate)
+                     .filter(AsciidocValidator::validate)
                      .forEach(path -> {
-                         SingleAsciidocPageStructureProvider provider = new SingleAsciidocPageStructureProvider(path, sourceEncoding);
-                         ConfluencePublisherMetadata confluencePublisherMetadata = asciidocConfluenceConverter.convert(provider, pageTitlePostProcessor, buildFolder, attributes);
-                         if (confluencePublisherMetadata.getPages().size() != 1) {
-                             throw new RuntimeException("Parsed multiple pages at once despite each-file mode when read file: " + path);
-                         }
-                         String parentTitle = confluencePublisherMetadata.getPages().get(0).getParentTitle();
-                         if (parentTitle.isEmpty()) {
-                             System.out.println("Asciidoc file (" + path + ") doesn't have :" + AsciidocConfluencePage.PARENT_PAGE_TITLE_ATTRIBUTE
-                                                + ": attribute. Skipped.");
-                         } else {
-                             try {
-                                 String parentId = confluenceClient.getPageByTitle(spaceKey, parentTitle);
-                                 confluencePublisherMetadata.setAncestorId(parentId);
-                                 ConfluencePublisher confluencePublisher = new ConfluencePublisher(confluencePublisherMetadata, publishingStrategy, KEEP_ORPHANS, confluenceClient, new SystemOutLoggingConfluencePublisherListener(), versionMessage);
-                                 confluencePublisher.publish();
-                             } catch (NotFoundException e) {
-                                 throw new IllegalArgumentException(
-                                         "Could not find the parent page being entitled: " + parentTitle, e);
-                             }
-                         }
+                        String parentTitle = AsciidocConfluencePage.parseParentTitle(path, sourceEncoding);
+                        if (parentTitle.isEmpty()) {
+                            System.out.println("Asciidoc file (" + path + ") doesn't have :" + AsciidocConfluencePage.PARENT_PAGE_TITLE_ATTRIBUTE
+                            + ": attribute. Skipped.");
+                            continue;
+                        }
+                        try {
+                            String parentId = confluenceClient.getPageByTitle(spaceKey, parentTitle);
+                            confluencePublisherMetadata.setAncestorId(parentId);
+                            ConfluencePublisher confluencePublisher = new ConfluencePublisher(confluencePublisherMetadata, publishingStrategy, KEEP_ORPHANS, confluenceClient, new SystemOutLoggingConfluencePublisherListener(), versionMessage);
+                            confluencePublisher.publish();
+                        } catch (NotFoundException e) {
+                            throw new IllegalArgumentException(
+                                    "Could not find the parent page being entitled: " + parentTitle, e);
+                        }
                      });
             } else {
                 if (ancestorId == null) {

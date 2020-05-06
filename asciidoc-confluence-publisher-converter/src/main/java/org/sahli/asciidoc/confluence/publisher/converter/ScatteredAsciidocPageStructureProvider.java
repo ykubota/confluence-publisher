@@ -11,10 +11,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.sahli.asciidoc.confluence.publisher.client.ConfluencePublisher;
 import org.sahli.asciidoc.confluence.publisher.client.http.NotFoundException;
 import org.sahli.asciidoc.confluence.publisher.client.metadata.ConfluencePublisherMetadata;
 
@@ -23,92 +24,59 @@ public class ScatteredAsciidocPageStructureProvider extends DefaultAsciidocPages
     private final AsciidocPagesStructure structure;
     private final Charset sourceEncoding;
 
-    public ScatteredAsciidocPageStructureProvider(Path documentationRootFolder, Charset sourceEncoding, AsciidocConfluenceConverter converter){
-        structure = buildStructure(documentationRootFolder, converter);
+    public ScatteredAsciidocPageStructureProvider(Path documentationRootFolder, Charset sourceEncoding){
+        structure = buildStructure(documentationRootFolder);
         this.sourceEncoding = sourceEncoding;
     }
 
-    private AsciidocPagesStructure buildStructure(Path documentationRootFolder, AsciidocConfluenceConverter converter) throws IOException {
-        walk(documentationRootFolder)
-                .filter(AsciidocValidator::validate)
-                .forEach(path -> {
-
-                })
-             .forEach(path -> {
-                 SingleAsciidocPageStructureProvider provider = new SingleAsciidocPageStructureProvider(path, sourceEncoding);
-                 ConfluencePublisherMetadata
-                         confluencePublisherMetadata = asciidocConfluenceConverter.convert(provider, pageTitlePostProcessor, buildFolder, attributes);
-                 if (confluencePublisherMetadata.getPages().size() != 1) {
-                     throw new RuntimeException("Parsed multiple pages at once despite each-file mode when read file: " + path);
-                 }
-                 String parentTitle = confluencePublisherMetadata.getPages().get(0).getParentTitle();
-                 if (parentTitle.isEmpty()) {
-                     System.out.println("Asciidoc file (" + path + ") doesn't have :" + AsciidocConfluencePage.PARENT_PAGE_TITLE_ATTRIBUTE
-                                        + ": attribute. Skipped.");
-                 } else {
-                     try {
-                         String parentId = confluenceClient.getPageByTitle(spaceKey, parentTitle);
-                         confluencePublisherMetadata.setAncestorId(parentId);
-                         ConfluencePublisher
-                                 confluencePublisher = new ConfluencePublisher(confluencePublisherMetadata, publishingStrategy, KEEP_ORPHANS, confluenceClient, new SystemOutLoggingConfluencePublisherListener(), versionMessage);
-                         confluencePublisher.publish();
-                     } catch (NotFoundException e) {
-                         throw new IllegalArgumentException(
-                                 "Could not find the parent page being entitled: " + parentTitle, e);
-                     }
-                 }
-             });
-
-
+    private AsciidocPagesStructure buildStructure(Path documentationRootFolder) {
         try {
-            Map<Path, DefaultAsciidocPage>
-                    asciidocPageIndex = indexAsciidocPagesByFolderPath(documentationRootFolder);
-            List<DefaultAsciidocPage> allAsciidocPages = connectAsciidocPagesToParent(asciidocPageIndex);
-            List<AsciidocPage> topLevelAsciiPages = findTopLevelAsciiPages(allAsciidocPages, documentationRootFolder);
-
-            return new DefaultAsciidocPagesStructure(topLevelAsciiPages);
-        } catch (IOException e) {
+            Map<String, EntitledAsciidocPage> index = indexAsciidocPageByTitle(documentationRootFolder);
+            index.forEach((title, page) -> {
+                index.computeIfPresent(page.getParentTitle(), (ignore, parentPage) -> {
+                    parentPage.addChild(page);
+                    index.remove(title);
+                    return parentPage;
+                });
+            });
+            Arrays.asList(index.values());
+        } catch (IOException | NullPointerException e) {
             throw new RuntimeException("Could not create asciidoc source structure", e);
         }
         return null;
     }
 
-    private List<DefaultAsciidocPage> connectAsciidocPagesToParent(Map<Path, DefaultAsciidocPage> asciidocPageIndex) {
-        asciidocPageIndex.forEach((asciidocPageFolderPath, asciidocPage) -> {
-            asciidocPageIndex.computeIfPresent(asciidocPage.path().getParent(), (ignored, parentAsciidocPage) -> {
-                parentAsciidocPage.addChild(asciidocPage);
-
-                return parentAsciidocPage;
-            });
-        });
-
-        return new ArrayList<>(asciidocPageIndex.values());
-    }
-
-    private static Map<Path, DefaultAsciidocPage> indexAsciidocPagesByFolderPath(Path documentationRootFolder) throws IOException {
+    private Map<String, EntitledAsciidocPage> indexAsciidocPageByTitle(Path documentationRootFolder) throws IOException {
         return walk(documentationRootFolder)
-                .filter((path) -> isAdocFile(path) && !isIncludeFile(path))
-                .collect(toMap((asciidocPagePath) -> removeExtension(asciidocPagePath), (asciidocPagePath) -> new DefaultAsciidocPage(asciidocPagePath)));
+                .filter(path -> validateAdocFile(path))
+                .collect(toMap(path->title(path), path -> new EntitledAsciidocPage(path)));
     }
 
-    private static List<AsciidocPage> findTopLevelAsciiPages(List<DefaultAsciidocPage> asciiPageByFolderPath, Path documentationRootFolder) {
-        return asciiPageByFolderPath.stream()
-                                    .filter((asciidocPage) -> asciidocPage.path().equals(documentationRootFolder.resolve(asciidocPage.path().getFileName())))
-                                    .collect(toList());
+    private String parentTitle(Path adocFilePath) {
+        return AsciidocConfluencePage.parseParentTitle(adocFilePath, sourceEncoding);
     }
 
-    private static Path removeExtension(Path path) {
-        return Paths.get(path.toString().substring(0, path.toString().lastIndexOf('.')));
+    private String title(Path adocFilePath) {
+        return AsciidocConfluencePage.parseTitle(adocFilePath, sourceEncoding);
     }
 
-    private static boolean isAdocFile(Path file) {
-        return file.toString().endsWith(ADOC_FILE_EXTENSION);
-    }
 
-    private static boolean isIncludeFile(Path file) {
-        return file.getFileName().toString().startsWith(INCLUDE_FILE_PREFIX);
-    }
+    class EntitledAsciidocPage extends DefaultAsciidocPage {
+        private final String title;
+        private final String parentTitle;
 
-    // Titleの重複
-    // 親を先
+        EntitledAsciidocPage(Path path) {
+            super(path);
+            this.title = title(path);
+            this.parentTitle = parentTitle(path);
+        }
+
+        public String getTitle(){
+            return title;
+        }
+
+        public String getParentTitle(){
+            return parentTitle;
+        }
+    }
 }
